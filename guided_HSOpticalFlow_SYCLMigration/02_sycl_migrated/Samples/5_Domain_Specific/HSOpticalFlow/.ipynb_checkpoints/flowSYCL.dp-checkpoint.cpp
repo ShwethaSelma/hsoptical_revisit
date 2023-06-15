@@ -58,7 +58,7 @@
 /// \param[out] u            horizontal displacement
 /// \param[out] v            vertical displacement
 ///////////////////////////////////////////////////////////////////////////////
-void ComputeFlowCUDA(const float *I0, const float *I1, int width, int height,
+void ComputeFlowSYCL(const float *I0, const float *I1, int width, int height,
                      int stride, float alpha, int nLevels, int nWarpIters,
                      int nSolverIters, float *u, float *v) {
   printf("Computing optical flow on Device...\n");
@@ -116,26 +116,8 @@ void ComputeFlowCUDA(const float *I0, const float *I1, int width, int height,
   *(pI1 + currentLevel) = (const float *)sycl::malloc_device(
                        dataSize, q);
 
-  float *pI0_h =
-      (float *)sycl::malloc_host(stride * height * sizeof(sycl::float4), q);
-  float *I0_h = (float *)sycl::malloc_host(dataSize, q);
-
-  float *pI1_h =
-      (float *)sycl::malloc_host(stride * height * sizeof(sycl::float4), q);
-  float *I1_h = (float *)sycl::malloc_host(dataSize, q);
-
-  float *src_d0 =
-      (float *)sycl::malloc_device(stride * height * sizeof(sycl::float4), q);
-  float *src_d1 =
-      (float *)sycl::malloc_device(stride * height * sizeof(sycl::float4), q);
-
-  q.memcpy((void *)I0_h, I0, dataSize);
-  q.memcpy((void *)I1_h, I1, dataSize);
-
-  q.memcpy((void *)pI0[currentLevel], I0, dataSize);
-  q.memcpy((void *)pI1[currentLevel], I1, dataSize);
-
-  q.wait();
+  q.memcpy((void *)pI0[currentLevel], I0, dataSize).wait();
+  q.memcpy((void *)pI1[currentLevel], I1, dataSize).wait();
 
   pW[currentLevel] = width;
   pH[currentLevel] = height;
@@ -151,39 +133,35 @@ void ComputeFlowCUDA(const float *I0, const float *I1, int width, int height,
     *(pI1 + currentLevel - 1) = (const float *)sycl::malloc_device(
              ns * nh * sizeof(float), q);
 
-    Downscale(pI0[currentLevel], pI0_h, I0_h, src_d0, pW[currentLevel],
-              pH[currentLevel], pS[currentLevel], nw, nh, ns,
-              (float *)pI0[currentLevel - 1], q);
+    Downscale(pI0[currentLevel], pW[currentLevel], pH[currentLevel],
+              pS[currentLevel], nw, nh, ns, (float *)pI0[currentLevel - 1], q);
 
-    Downscale(pI1[currentLevel], pI0_h, I0_h, src_d0, pW[currentLevel],
-              pH[currentLevel], pS[currentLevel], nw, nh, ns,
-              (float *)pI1[currentLevel - 1], q);
+    Downscale(pI1[currentLevel], pW[currentLevel], pH[currentLevel],
+              pS[currentLevel], nw, nh, ns, (float *)pI1[currentLevel - 1], q);
 
     pW[currentLevel - 1] = nw;
     pH[currentLevel - 1] = nh;
     pS[currentLevel - 1] = ns;
   }
 
-  q.memset(d_u, 0, stride * height * sizeof(float));
-  q.memset(d_v, 0, stride * height * sizeof(float));
-  q.wait();
+  q.memset(d_u, 0, stride * height * sizeof(float)).wait();
+  q.memset(d_v, 0, stride * height * sizeof(float)).wait();
 
   // compute flow
   for (; currentLevel < nLevels; ++currentLevel) {
     for (int warpIter = 0; warpIter < nWarpIters; ++warpIter) {
-      q.memset(d_du0, 0, dataSize);
-      q.memset(d_dv0, 0, dataSize);
+      q.memset(d_du0, 0, dataSize).wait();
+      q.memset(d_dv0, 0, dataSize).wait();
 
-      q.memset(d_du1, 0, dataSize);
-      q.memset(d_dv1, 0, dataSize);
+      q.memset(d_du1, 0, dataSize).wait();
+      q.memset(d_dv1, 0, dataSize).wait();
 
       // on current level we compute optical flow
       // between frame 0 and warped frame 1
-      WarpImage(pI1[currentLevel], pI0_h, I0_h, src_d0, pW[currentLevel], pH[currentLevel],
+      WarpImage(pI1[currentLevel], pW[currentLevel], pH[currentLevel],
                 pS[currentLevel], d_u, d_v, d_tmp, q);
 
-      ComputeDerivatives(pI0[currentLevel], d_tmp, pI0_h, pI1_h, I0_h, I1_h,
-                         src_d0, src_d1, pW[currentLevel],
+      ComputeDerivatives(pI0[currentLevel], d_tmp, pW[currentLevel],
                          pH[currentLevel], pS[currentLevel], d_Ix, d_Iy, d_Iz, q);
 
       for (int iter = 0; iter < nSolverIters; ++iter) {
@@ -203,13 +181,13 @@ void ComputeFlowCUDA(const float *I0, const float *I1, int width, int height,
       // prolongate solution
       float scaleX = (float)pW[currentLevel + 1] / (float)pW[currentLevel];
 
-      Upscale(d_u, pI0_h, I0_h, src_d0, pW[currentLevel], pH[currentLevel], pS[currentLevel],
+      Upscale(d_u, pW[currentLevel], pH[currentLevel], pS[currentLevel],
               pW[currentLevel + 1], pH[currentLevel + 1], pS[currentLevel + 1],
               scaleX, d_nu, q);
 
       float scaleY = (float)pH[currentLevel + 1] / (float)pH[currentLevel];
 
-      Upscale(d_v, pI0_h, I0_h, src_d0, pW[currentLevel], pH[currentLevel], pS[currentLevel],
+      Upscale(d_v, pW[currentLevel], pH[currentLevel], pS[currentLevel],
               pW[currentLevel + 1], pH[currentLevel + 1], pS[currentLevel + 1],
               scaleY, d_nv, q);
 
@@ -218,9 +196,8 @@ void ComputeFlowCUDA(const float *I0, const float *I1, int width, int height,
     }
   }
 
-  q.memcpy(u, d_u, dataSize);
-  q.memcpy(v, d_v, dataSize);
-  q.wait();
+  q.memcpy(u, d_u, dataSize).wait();
+  q.memcpy(v, d_v, dataSize).wait();
 
   // cleanup
   for (int i = 0; i < nLevels; ++i) {

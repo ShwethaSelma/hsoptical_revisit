@@ -41,7 +41,7 @@ const float THRESHOLD = 0.05f;
 
 #include "common.h"
 #include "flowGold.h"
-#include "flowCUDA.h"
+#include "flowSYCL.h"
 
 #include <helper_functions.h>
 #include <cmath>
@@ -227,7 +227,7 @@ int main(int argc, char **argv) {
   
   // start Device Timer
   auto startSYCLTime = Time::now();
-  ComputeFlowCUDA(h_source, h_target, width, height, stride, alpha, nLevels,
+  ComputeFlowSYCL(h_source, h_target, width, height, stride, alpha, nLevels,
                   nWarpIters, nSolverIters, h_u, h_v);
   
   // stop Device Timer
