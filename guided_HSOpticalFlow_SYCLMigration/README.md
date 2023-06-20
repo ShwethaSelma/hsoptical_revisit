@@ -9,16 +9,14 @@ The `HSOpticalFlow` is a computation of per-pixel motion estimation between two 
 
 ## Purpose
 
-Optical flow method is based on two assumptions: brightness constancy and spatial flow smoothness. These assumptions are combined in a single energy functional and solution is found as its minimum point. The sample includes both parallel and serial computation, which allows for direct results comparison between CPU and Device.  
-The parallel implementation demonstrates the use of key SYCL concepts, such as
+Optical flow method is based on two assumptions: brightness constancy and spatial flow smoothness. These assumptions are combined in a single energy functional and solution is found as its minimum point. The sample includes both parallel and serial computation, which allows for direct results comparison between CPU and Device. Input images of the sample are computed to get the absolute difference value output(L1 error) between serial and parallel computation. The parallel implementation demonstrates the use of key SYCL concepts, such as
 
-- Texture memory
-- Cooperative groups
+- Image Processing
+- SYCL Image memory
+- Sub-group primitives 
 - Shared Memory
 
-
-
- The sample illustrates the steps needed for manual migration of explicit CUDA Graph API's such as cudaGraphCreate(), cudaGraphAddMemcpyNode(), cudaGraphLaunch() to SYCL equivalent API's using [Taskflow](https://github.com/taskflow/taskflow) programming Model.
+This sample illustrates the steps needed for manual migration of CUDA Texture memory object and API's such as  cudaResourceDesc, cudaTextureDesc, cudaCreateTextureObject() etc, to SYCL equivalent. These CUDA Texture memory API's are manually migrated to SYCL Image memory API's.
 
 > **Note**: We use Intel's open-source SYCLomatic tool which assists developers in porting CUDA code automatically to SYCL code. To finish the process, developers complete the rest of the coding manually and then tune to the desired level of performance for the target architecture. Users can also use the Intel® DPC++ Compatibility Tool, available to augment the Intel® oneAPI Base Toolkit.
 
@@ -36,26 +34,18 @@ Refer [Workflow](https://www.intel.com/content/www/us/en/developer/tools/oneapi/
 
 ### CUDA source code evaluation
 
-The Jacobi CUDA Graphs sample uses Jacobi iterative algorithm to determines the number of iterations needed to solve system of Linear Equations. All computations happen inside a for-loop.
+The HSOptical Flow sample includes both serial and parallel implementation of the algorithm in flowGold.cpp and flowCUDA.cu files respectively. In the parallel implementation the computation is distributed among following six kernel,
 
-There are two exit criteria from the loop:
-  1.  Execution reaches the maximum number of iterations 
-  2.  The final error falls below the desired tolerance.
- 
-Each iteration has two parts:
-  - Jacobi Method computation
-  - Final Error computation
+- `AddKernel()`: Performs vector addition 
+- `ComputeDerivativesKernel()`: Computes temporal and spatial derivatives of images 
+- `DownscaleKernel()`:Computes image downsizing 
+- `JacobiIteration()`: Computes for Jacobi iterarion with border conditions explicitly handled within the kernels 
+- `UpscaleKernel()`: Upscales one component of an image displacement field
+- `WarpingKernel()`: Warps image with given displacement field 
 
-In both `Jacobi Method` and `Final Error` Kernels reduction is performed to obtain the final error or sum value. 
-The kernel uses cooperative groups, warp-level primitives, atomics and shared memory for the faster and frequent memory access to the block. These computation are loaded into kernel by host function which can be achieved through any one of the three methods. 
-  1.  `JacobiMethodGpuCudaGraphExecKernelSetParams()`, which uses explicit CUDA Graph APIs
-  2.  `JacobiMethodGpuCudaGraphExecUpdate()`, which uses CUDA stream capture APIs to launch
-  3.  `JacobiMethodGpu()`, which uses regular CUDA API's to launch kernels. 
-  
-  We migrate the first and third host function using SYCLomatic. We then migrate the remaining CUDA Graphs code section using [Taskflow](https://github.com/taskflow/taskflow) Programming Model. 
-  We do not migrate `JacobiMethodGpuCudaGraphExecUpdate()`, because CUDA Stream Capture APIs are not yet supported in SYCL.
+The host code of downscale, Computederivatives, Upscale and Warping uses texture memory for image data computation. The final computed result of serial and parallel implememtation are then compared based on the threshold value.
 
-This sample is migrated from NVIDIA CUDA sample. See the [JacobiCudaGraphs](https://github.com/NVIDIA/cuda-samples/tree/v11.8/Samples/3_CUDA_Features/jacobiCudaGraphs) sample in the NVIDIA/cuda-samples GitHub.
+This sample is migrated from NVIDIA CUDA sample. See the [HSOpticalFlow](https://github.com/NVIDIA/cuda-samples/tree/v11.8/Samples/5_Domain_Specific/HSOpticalFlow) sample in the NVIDIA/cuda-samples GitHub.
 
 ## Prerequisites
 
@@ -70,13 +60,9 @@ For more information on how to use Syclomatic, visit [Migrate from CUDA* to C++ 
 ## Key Implementation Details
 
 This sample demonstrates the migration of the following prominent CUDA features: 
-- CUDA Graph APIs
-- CUDA Stream Capture
-- Atomic Operations
+- CUDA Texture Memory API
 - Shared memory
-- CUDA streams 
 - Cooperative groups
-- Warp-level Primitives
 
 The Jacobi CUDA Graphs computations happen inside a two- kernel Jacobi Method and Final Error Kernels., Element reduction is performed to obtain the final error or sum value. 
 In this sample, the vectors are loaded into shared memory for faster memory access and thread blocks are partitioned into tiles. Then, reduction of input data is performed in each of the partitioned tiles using sub-group primitives. These intermediate results are then added to a final sum variable via an atomic add operation. 
