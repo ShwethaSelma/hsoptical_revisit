@@ -226,40 +226,43 @@ Once the CUDA code is migrated to SYCL successfully and functionality is achieve
 
 Since CUDA HSOptical Flow sample uses single channel image and SYCL supports only 4 channel image format we have manually adjusted two properties of image data. Image data type format and Image input layout where Image data are padded for additional image channels. For this purpose, created additional host and USM memory using `malloc_shared` which is padded.
 
-    ```
-    int dataSize = height * stride * sizeof(float);
-    float *src_h = (float *)malloc(dataSize);
-    q.memcpy(src_h, src, dataSize).wait();
+```
+int dataSize = height * stride * sizeof(float);
+float *src_h = (float *)malloc(dataSize);
+q.memcpy(src_h, src, dataSize).wait();
 
-    float *src_p =
-      (float *)sycl::malloc_shared(height * stride * sizeof(sycl::float4), q);
-    for (int i = 0; i < 4 * height * stride; i++) src_p[i] = 0.f;
+float *src_p =
+    (float *)sycl::malloc_shared(height * stride * sizeof(sycl::float4), q);
+for (int i = 0; i < 4 * height * stride; i++) src_p[i] = 0.f;
 
-    for (int i = 0; i < height; i++) {
-      for (int j = 0; j < width; j++) {
-        int index = i * stride + j;
-        src_p[index * 4 + 0] = src_h[index];
-        src_p[index * 4 + 1] = src_p[index * 4 + 2] = src_p[index * 4 + 3] = 0.f;}
-    }
-    ```
-    Even though malloc_shared gives us shared memory allocation that is accessible on the host and on sycl Device it increases execution time as it creates lot of unnecessary memory movement in code. To avoid this unnecessary memory copies, we can replace the `malloc_shared` with `malloc_device`.
-    ```
-    int dataSize = height * stride * sizeof(float);
-    float *pI0_h = (float *)sycl::malloc_host(height * stride * sizeof(sycl::float4), q);
-    float *I0_h = (float *)sycl::malloc_host(dataSize, q);
+for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      int index = i * stride + j;
+      src_p[index * 4 + 0] = src_h[index];
+      src_p[index * 4 + 1] = src_p[index * 4 + 2] = src_p[index * 4 + 3] = 0.f;}
+}
+```
+    
+Even though malloc_shared gives us shared memory allocation that is accessible on the host and on sycl Device it increases execution time as it creates lot of unnecessary memory movement in code. To avoid this unnecessary memory copies, we can replace the `malloc_shared` with `malloc_device`.
+    
+```
+int dataSize = height * stride * sizeof(float);
+float *pI0_h = (float *)sycl::malloc_host(height * stride * sizeof(sycl::float4), q);
+float *I0_h = (float *)sycl::malloc_host(dataSize, q);
 
-    q.memcpy(I0_h, src, dataSize).wait();
+q.memcpy(I0_h, src, dataSize).wait();
 
-    for (int i = 0; i < height; i++) {
-      for (int j = 0; j < width; j++) {
-        int index = i * stride + j;
-        pI0_h[index * 4 + 0] = I0_h[index];
-        pI0_h[index * 4 + 1] = pI0_h[index * 4 + 2] = pI0_h[index * 4 + 3] = 0.f;}
-    }
+for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      int index = i * stride + j;
+      pI0_h[index * 4 + 0] = I0_h[index];
+      pI0_h[index * 4 + 1] = pI0_h[index * 4 + 2] = pI0_h[index * 4 + 3] = 0.f;}
+}
 
-    q.memcpy(src_p, pI0_h, height * width * sizeof(sycl::float4)).wait();
-    ```
-    malloc_device returns a pointer to the newly allocated memory on the specified device on success. This memory is not accessible on the host. Hence, we need to copy memory to host when required. Also copying from malloc_host to malloc_device is faster than compared to C malloc to malloc_device.
+q.memcpy(src_p, pI0_h, height * width * sizeof(sycl::float4)).wait();
+```
+    
+malloc_device returns a pointer to the newly allocated memory on the specified device on success. This memory is not accessible on the host. Hence, we need to copy memory to host when required. Also copying from malloc_host to malloc_device is faster than compared to C malloc to malloc_device.
 
 This optimization changes are performed in Downscale, Warping, Upscale and ComputeDerivative methods can be found in  `03_sycl_migrated_optimized` folder.
 
