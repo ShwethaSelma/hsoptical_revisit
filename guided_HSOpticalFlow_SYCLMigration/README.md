@@ -45,7 +45,8 @@ The HSOptical Flow sample includes both serial and parallel implementation of th
 
 The host code of downscale, Computederivatives, Upscale and Warping uses texture memory for image data computation. The final computed result of serial and parallel implememtation are then compared based on the threshold value.
 
-This sample is migrated from NVIDIA CUDA sample. See the [HSOpticalFlow](https://github.com/NVIDIA/cuda-samples/tree/v11.8/Samples/5_Domain_Specific/HSOpticalFlow) sample in the NVIDIA/cuda-samples GitHub.
+> **Note**: This sample is migrated from NVIDIA CUDA sample. See the [HSOpticalFlow](https://github.com/NVIDIA/cuda-samples/tree/v11.8/Samples/5_Domain_Specific/HSOpticalFlow) sample in the NVIDIA/cuda-samples GitHub.
+> For more information on Optical Flow Algorithm and CUDA implementation refer [here](https://github.com/NVIDIA/cuda-samples/blob/v11.8/Samples/5_Domain_Specific/HSOpticalFlow/doc/OpticalFlow.pdf).
 
 ## Prerequisites
 
