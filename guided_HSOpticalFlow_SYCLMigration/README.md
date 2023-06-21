@@ -57,7 +57,7 @@ The host code of downscale, Computederivatives, Upscale and Warping uses texture
 | Hardware                   | Intel® Gen9, Gen11, and Xeon CPU
 | Software                   | SYCLomatic version 2023.1, Intel® oneAPI Base Toolkit version 2023.1
 
-For more information on how to use Syclomatic, visit [Migrate from CUDA* to C++ with SYCL*](https://www.intel.com/content/www/us/en/developer/tools/oneapi/training/migrate-from-cuda-to-cpp-with-sycl.html#gs.vmhplg).
+Download the Intel® oneAPI Base Toolkit from [here](https://www.intel.com/content/www/us/en/developer/tools/oneapi/base-toolkit-download.html). And for more information on how to use Syclomatic, visit [Migrate from CUDA* to C++ with SYCL*](https://www.intel.com/content/www/us/en/developer/tools/oneapi/training/migrate-from-cuda-to-cpp-with-sycl.html#gs.vmhplg).
 
 ## Key Implementation Details
 
