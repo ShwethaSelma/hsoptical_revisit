@@ -16,7 +16,7 @@ Optical flow method is based on two assumptions: brightness constancy and spatia
 - Sub-group primitives 
 - Shared Memory
 
-This sample illustrates the steps needed for manual migration of CUDA Texture memory object and API's such as  cudaResourceDesc, cudaTextureDesc, cudaCreateTextureObject() etc, to SYCL equivalent. These CUDA Texture memory API's are manually migrated to SYCL Image memory API's.
+This sample illustrates the steps needed for manual migration of CUDA Texture memory object and API's such as  cudaResourceDesc, cudaTextureDesc, cudaCreateTextureObject() to SYCL equivalent. These CUDA Texture memory API's are manually migrated to SYCL Image memory API's.
 
 > **Note**: We use Intel's open-source SYCLomatic tool which assists developers in porting CUDA code automatically to SYCL code. To finish the process, developers complete the rest of the coding manually and then tune to the desired level of performance for the target architecture. Users can also use the Intel® DPC++ Compatibility Tool, available to augment the Intel® oneAPI Base Toolkit.
 
